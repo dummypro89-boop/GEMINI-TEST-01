@@ -1,11 +1,31 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getFirestore,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { firebaseConfig } from "./firebase-config.js";
+
 const STORAGE_KEYS = {
   members: "truly_pilates_members",
   bookings: "truly_pilates_bookings",
-  media: "truly_pilates_media",
-  admin: "truly_pilates_admin"
+  media: "truly_pilates_media"
 };
 
-const ADMIN_PASSWORD = "truly2026";
+const COLLECTIONS = {
+  members: "members",
+  bookings: "bookings",
+  media: "media"
+};
 
 const defaults = {
   members: [
@@ -38,10 +58,13 @@ const defaults = {
 };
 
 const state = {
-  members: load(STORAGE_KEYS.members, defaults.members),
-  bookings: load(STORAGE_KEYS.bookings, defaults.bookings),
-  media: load(STORAGE_KEYS.media, defaults.media),
-  isAdmin: load(STORAGE_KEYS.admin, false)
+  members: [],
+  bookings: [],
+  media: [],
+  isAdmin: false,
+  calendarYear: new Date().getFullYear(),
+  calendarMonth: new Date().getMonth(),
+  selectedDate: ""
 };
 
 const el = {
@@ -60,7 +83,15 @@ const el = {
   adminLogoutBtn: document.querySelector("#adminLogoutBtn"),
   resetDataBtn: document.querySelector("#resetDataBtn"),
   adminTools: document.querySelector("#adminTools"),
-  adminResult: document.querySelector("#adminResult")
+  adminResult: document.querySelector("#adminResult"),
+  dataMode: document.querySelector("#dataMode"),
+  calPrevBtn: document.querySelector("#calPrevBtn"),
+  calNextBtn: document.querySelector("#calNextBtn"),
+  calLabel: document.querySelector("#calLabel"),
+  calendarGrid: document.querySelector("#calendarGrid"),
+  selectedDateLabel: document.querySelector("#selectedDateLabel"),
+  clearDateFilterBtn: document.querySelector("#clearDateFilterBtn"),
+  bookingAlertList: document.querySelector("#bookingAlertList")
 };
 
 function load(key, fallback) {
@@ -88,12 +119,183 @@ function statusByRemaining(remaining) {
 
 function setAdminMode(isAdmin) {
   state.isAdmin = isAdmin;
-  save(STORAGE_KEYS.admin, isAdmin);
   document.body.classList.toggle("is-admin", isAdmin);
   el.adminTools.classList.toggle("hidden", !isAdmin);
   renderMembers(el.memberSearch.value);
   renderBookings();
   renderMedia();
+  renderCalendar();
+  renderAlerts();
+}
+
+const firebaseEnabled = Boolean(
+  firebaseConfig &&
+    firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+);
+
+let db = null;
+let auth = null;
+let usingFirestore = false;
+let usingAuth = false;
+
+if (firebaseEnabled) {
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    usingFirestore = true;
+    usingAuth = true;
+  } catch (error) {
+    usingFirestore = false;
+    usingAuth = false;
+  }
+}
+
+function setDataModeText() {
+  const dbMode = usingFirestore ? "Firebase Firestore" : "로컬 저장소(localStorage)";
+  const authMode = usingAuth ? "Firebase Auth" : "비활성";
+  el.dataMode.textContent = `데이터 모드: ${dbMode} | 인증 모드: ${authMode}`;
+}
+
+function formatDate(year, month, day) {
+  const mm = String(month + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
+}
+
+function bookingDateTime(booking) {
+  return new Date(`${booking.date}T${booking.time || "00:00"}`);
+}
+
+function getVisibleBookings() {
+  if (!state.selectedDate) return state.bookings;
+  return state.bookings.filter((booking) => booking.date === state.selectedDate);
+}
+
+function renderCalendar() {
+  if (!el.calendarGrid || !el.calLabel) return;
+
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+  const firstDay = new Date(state.calendarYear, state.calendarMonth, 1);
+  const startWeekday = firstDay.getDay();
+  const lastDate = new Date(state.calendarYear, state.calendarMonth + 1, 0).getDate();
+  const bookedDates = new Set(state.bookings.map((booking) => booking.date));
+
+  el.calLabel.textContent = `${state.calendarYear}년 ${state.calendarMonth + 1}월`;
+
+  const cells = [];
+  for (const weekday of weekdays) {
+    cells.push(`<div class="calendar-cell">${weekday}</div>`);
+  }
+
+  for (let i = 0; i < startWeekday; i += 1) {
+    cells.push("<div class='calendar-day is-empty'></div>");
+  }
+
+  for (let day = 1; day <= lastDate; day += 1) {
+    const dateKey = formatDate(state.calendarYear, state.calendarMonth, day);
+    const hasBooking = bookedDates.has(dateKey) ? "has-booking" : "";
+    const selected = state.selectedDate === dateKey ? "is-selected" : "";
+    cells.push(
+      `<button class="calendar-day ${hasBooking} ${selected}" data-action="pick-date" data-date="${dateKey}" type="button">${day}</button>`
+    );
+  }
+
+  el.calendarGrid.innerHTML = cells.join("");
+  if (el.selectedDateLabel) {
+    el.selectedDateLabel.textContent = state.selectedDate ? `${state.selectedDate} 예약만 표시` : "전체 예약 표시";
+  }
+}
+
+function renderAlerts() {
+  if (!el.bookingAlertList) return;
+  const now = new Date();
+  const soon = [];
+
+  for (const booking of state.bookings) {
+    const when = bookingDateTime(booking);
+    const diff = when.getTime() - now.getTime();
+    const isSoon = diff >= 0 && diff <= 48 * 60 * 60 * 1000;
+    if (booking.status === "대기" || isSoon) {
+      soon.push(booking);
+    }
+  }
+
+  if (!soon.length) {
+    el.bookingAlertList.innerHTML = "<li>현재 확인할 예약 알림이 없습니다.</li>";
+    return;
+  }
+
+  el.bookingAlertList.innerHTML = soon
+    .sort((a, b) => bookingDateTime(a) - bookingDateTime(b))
+    .slice(0, 8)
+    .map((booking) => `<li>${booking.date} ${booking.time} ${booking.name} (${booking.status})</li>`)
+    .join("");
+}
+
+async function dbReadCollection(collectionName) {
+  if (!usingFirestore || !db) return null;
+  const snapshot = await getDocs(collection(db, collectionName));
+  return snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+}
+
+async function dbUpsert(collectionName, item) {
+  if (!usingFirestore || !db) return;
+  await setDoc(doc(db, collectionName, item.id), item, { merge: true });
+}
+
+async function dbRemove(collectionName, id) {
+  if (!usingFirestore || !db) return;
+  await deleteDoc(doc(db, collectionName, id));
+}
+
+async function seedIfEmpty() {
+  if (!usingFirestore || !db) return;
+  const [members, bookings, media] = await Promise.all([
+    dbReadCollection(COLLECTIONS.members),
+    dbReadCollection(COLLECTIONS.bookings),
+    dbReadCollection(COLLECTIONS.media)
+  ]);
+
+  if (members.length || bookings.length || media.length) return;
+
+  for (const member of defaults.members) await dbUpsert(COLLECTIONS.members, member);
+  for (const item of defaults.media) await dbUpsert(COLLECTIONS.media, item);
+}
+
+function saveLocalBackup() {
+  save(STORAGE_KEYS.members, state.members);
+  save(STORAGE_KEYS.bookings, state.bookings);
+  save(STORAGE_KEYS.media, state.media);
+}
+
+async function initializeData() {
+  if (!usingFirestore) {
+    state.members = load(STORAGE_KEYS.members, defaults.members);
+    state.bookings = load(STORAGE_KEYS.bookings, defaults.bookings);
+    state.media = load(STORAGE_KEYS.media, defaults.media);
+    return;
+  }
+
+  try {
+    await seedIfEmpty();
+    const [members, bookings, media] = await Promise.all([
+      dbReadCollection(COLLECTIONS.members),
+      dbReadCollection(COLLECTIONS.bookings),
+      dbReadCollection(COLLECTIONS.media)
+    ]);
+    state.members = members;
+    state.bookings = bookings;
+    state.media = media;
+    saveLocalBackup();
+  } catch (error) {
+    usingFirestore = false;
+    state.members = load(STORAGE_KEYS.members, defaults.members);
+    state.bookings = load(STORAGE_KEYS.bookings, defaults.bookings);
+    state.media = load(STORAGE_KEYS.media, defaults.media);
+  }
 }
 
 function renderMembers(keyword = "") {
@@ -134,12 +336,13 @@ function renderMembers(keyword = "") {
 }
 
 function renderBookings() {
-  if (!state.bookings.length) {
+  const visible = getVisibleBookings();
+  if (!visible.length) {
     el.bookingTableBody.innerHTML = "<tr><td colspan='6'>아직 예약이 없습니다.</td></tr>";
     return;
   }
 
-  el.bookingTableBody.innerHTML = state.bookings
+  el.bookingTableBody.innerHTML = visible
     .map((booking) => {
       return `
         <tr>
@@ -189,12 +392,6 @@ function renderMedia() {
     .join("");
 }
 
-function persistAll() {
-  save(STORAGE_KEYS.members, state.members);
-  save(STORAGE_KEYS.bookings, state.bookings);
-  save(STORAGE_KEYS.media, state.media);
-}
-
 el.memberSearch.addEventListener("input", (event) => {
   renderMembers(event.target.value);
 });
@@ -204,7 +401,33 @@ el.clearSearch.addEventListener("click", () => {
   renderMembers();
 });
 
-el.memberAddForm.addEventListener("submit", (event) => {
+el.calPrevBtn?.addEventListener("click", () => {
+  if (state.calendarMonth === 0) {
+    state.calendarMonth = 11;
+    state.calendarYear -= 1;
+  } else {
+    state.calendarMonth -= 1;
+  }
+  renderCalendar();
+});
+
+el.calNextBtn?.addEventListener("click", () => {
+  if (state.calendarMonth === 11) {
+    state.calendarMonth = 0;
+    state.calendarYear += 1;
+  } else {
+    state.calendarMonth += 1;
+  }
+  renderCalendar();
+});
+
+el.clearDateFilterBtn?.addEventListener("click", () => {
+  state.selectedDate = "";
+  renderCalendar();
+  renderBookings();
+});
+
+el.memberAddForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.isAdmin) return;
   const data = new FormData(el.memberAddForm);
@@ -218,13 +441,14 @@ el.memberAddForm.addEventListener("submit", (event) => {
     status: statusByRemaining(remaining)
   };
   state.members.unshift(member);
-  persistAll();
+  saveLocalBackup();
+  await dbUpsert(COLLECTIONS.members, member);
   renderMembers(el.memberSearch.value);
   el.memberResult.textContent = `${member.name} 회원이 추가되었습니다.`;
   el.memberAddForm.reset();
 });
 
-el.bookingForm.addEventListener("submit", (event) => {
+el.bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(el.bookingForm);
   const booking = {
@@ -237,13 +461,16 @@ el.bookingForm.addEventListener("submit", (event) => {
     status: "대기"
   };
   state.bookings.unshift(booking);
-  persistAll();
+  saveLocalBackup();
+  await dbUpsert(COLLECTIONS.bookings, booking);
   renderBookings();
+  renderCalendar();
+  renderAlerts();
   el.bookingResult.textContent = `${booking.name} 님, ${booking.date} ${booking.time} ${booking.classType} 예약이 접수되었습니다.`;
   el.bookingForm.reset();
 });
 
-el.mediaAddForm.addEventListener("submit", (event) => {
+el.mediaAddForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.isAdmin) return;
   const data = new FormData(el.mediaAddForm);
@@ -254,47 +481,84 @@ el.mediaAddForm.addEventListener("submit", (event) => {
     url: String(data.get("url")).trim()
   };
   state.media.unshift(item);
-  persistAll();
+  saveLocalBackup();
+  await dbUpsert(COLLECTIONS.media, item);
   renderMedia();
   el.mediaResult.textContent = `${item.title} 미디어가 추가되었습니다.`;
   el.mediaAddForm.reset();
 });
 
-el.adminLoginForm.addEventListener("submit", (event) => {
+el.adminLoginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const data = new FormData(el.adminLoginForm);
-  const password = String(data.get("password"));
-  if (password !== ADMIN_PASSWORD) {
-    el.adminResult.textContent = "비밀번호가 올바르지 않습니다.";
+  if (!usingAuth || !auth) {
+    el.adminResult.textContent = "Firebase Auth 설정 후 관리자 로그인이 가능합니다.";
     return;
   }
-  setAdminMode(true);
-  el.adminResult.textContent = "관리자 로그인 완료";
-  el.adminLoginForm.reset();
+
+  const data = new FormData(el.adminLoginForm);
+  const email = String(data.get("email")).trim();
+  const password = String(data.get("password"));
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    el.adminResult.textContent = "관리자 로그인 완료";
+    el.adminLoginForm.reset();
+  } catch (error) {
+    el.adminResult.textContent = "로그인 실패: 이메일/비밀번호를 확인하세요.";
+  }
 });
 
-el.adminLogoutBtn.addEventListener("click", () => {
-  setAdminMode(false);
+el.adminLogoutBtn.addEventListener("click", async () => {
+  if (!usingAuth || !auth) {
+    setAdminMode(false);
+    el.adminResult.textContent = "로그아웃되었습니다.";
+    return;
+  }
+
+  await signOut(auth);
   el.adminResult.textContent = "로그아웃되었습니다.";
 });
 
-el.resetDataBtn.addEventListener("click", () => {
+el.resetDataBtn.addEventListener("click", async () => {
   if (!state.isAdmin) return;
   state.members = [...defaults.members];
   state.bookings = [...defaults.bookings];
   state.media = [...defaults.media];
-  persistAll();
+  saveLocalBackup();
+
+  if (usingFirestore) {
+    const [members, bookings, media] = await Promise.all([
+      dbReadCollection(COLLECTIONS.members),
+      dbReadCollection(COLLECTIONS.bookings),
+      dbReadCollection(COLLECTIONS.media)
+    ]);
+    for (const row of members) await dbRemove(COLLECTIONS.members, row.id);
+    for (const row of bookings) await dbRemove(COLLECTIONS.bookings, row.id);
+    for (const row of media) await dbRemove(COLLECTIONS.media, row.id);
+    for (const row of defaults.members) await dbUpsert(COLLECTIONS.members, row);
+    for (const row of defaults.media) await dbUpsert(COLLECTIONS.media, row);
+  }
+
   renderMembers(el.memberSearch.value);
   renderBookings();
   renderMedia();
+  renderCalendar();
+  renderAlerts();
   el.adminResult.textContent = "데이터를 초기값으로 되돌렸습니다.";
 });
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   const action = target.dataset.action;
   if (!action) return;
+
+  if (action === "pick-date") {
+    state.selectedDate = target.dataset.date || "";
+    renderCalendar();
+    renderBookings();
+    return;
+  }
 
   const id = target.dataset.id;
   if (!id || !state.isAdmin) return;
@@ -306,14 +570,17 @@ document.addEventListener("click", (event) => {
       const next = Math.max(0, member.remaining + delta);
       return { ...member, remaining: next, status: statusByRemaining(next) };
     });
-    persistAll();
+    const changed = state.members.find((row) => row.id === id);
+    saveLocalBackup();
+    if (changed) await dbUpsert(COLLECTIONS.members, changed);
     renderMembers(el.memberSearch.value);
     return;
   }
 
   if (action === "delete-member") {
     state.members = state.members.filter((member) => member.id !== id);
-    persistAll();
+    saveLocalBackup();
+    await dbRemove(COLLECTIONS.members, id);
     renderMembers(el.memberSearch.value);
     return;
   }
@@ -321,26 +588,48 @@ document.addEventListener("click", (event) => {
   if (action === "booking-ok" || action === "booking-cancel") {
     const nextStatus = action === "booking-ok" ? "확정" : "취소";
     state.bookings = state.bookings.map((booking) => (booking.id === id ? { ...booking, status: nextStatus } : booking));
-    persistAll();
+    const changed = state.bookings.find((row) => row.id === id);
+    saveLocalBackup();
+    if (changed) await dbUpsert(COLLECTIONS.bookings, changed);
     renderBookings();
+    renderAlerts();
     return;
   }
 
   if (action === "booking-delete") {
     state.bookings = state.bookings.filter((booking) => booking.id !== id);
-    persistAll();
+    saveLocalBackup();
+    await dbRemove(COLLECTIONS.bookings, id);
     renderBookings();
+    renderCalendar();
+    renderAlerts();
     return;
   }
 
   if (action === "delete-media") {
     state.media = state.media.filter((item) => item.id !== id);
-    persistAll();
+    saveLocalBackup();
+    await dbRemove(COLLECTIONS.media, id);
     renderMedia();
   }
 });
 
-setAdminMode(Boolean(state.isAdmin));
+function bindAuthObserver() {
+  if (!usingAuth || !auth) {
+    setAdminMode(false);
+    return;
+  }
+
+  onAuthStateChanged(auth, (user) => {
+    setAdminMode(Boolean(user));
+  });
+}
+
+await initializeData();
+setDataModeText();
+bindAuthObserver();
 renderMembers();
 renderBookings();
 renderMedia();
+renderCalendar();
+renderAlerts();

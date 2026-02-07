@@ -279,6 +279,59 @@ thead {
   gap: 0.6rem;
 }
 
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.calendar-cell {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0.35rem 0.1rem;
+}
+
+.calendar-day {
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  border-radius: 8px;
+  padding: 0.5rem 0.2rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.calendar-day.has-booking {
+  border-color: var(--accent);
+}
+
+.calendar-day.is-selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.calendar-day.is-empty {
+  visibility: hidden;
+}
+
+.alert-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.alert-list li {
+  margin: 0.25rem 0;
+}
+
 .action-group {
   display: flex;
   gap: 0.4rem;
