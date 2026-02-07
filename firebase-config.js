@@ -6,3 +6,7 @@ export const firebaseConfig = {
   messagingSenderId: "",
   appId: ""
 };
+
+export const adminEmails = [
+  "admin@example.com"
+];

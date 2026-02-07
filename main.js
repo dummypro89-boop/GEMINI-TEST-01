@@ -13,18 +13,25 @@ import {
   signInWithEmailAndPassword,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { adminEmails, firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEYS = {
   members: "truly_pilates_members",
   bookings: "truly_pilates_bookings",
-  media: "truly_pilates_media"
+  media: "truly_pilates_media",
+  authGuard: "truly_pilates_auth_guard"
 };
 
 const COLLECTIONS = {
   members: "members",
   bookings: "bookings",
   media: "media"
+};
+
+const AUTH_GUARD_POLICY = {
+  maxAttempts: 5,
+  windowMs: 10 * 60 * 1000,
+  lockMs: 15 * 60 * 1000
 };
 
 const defaults = {
@@ -117,6 +124,50 @@ function statusByRemaining(remaining) {
   return "수강중";
 }
 
+function nowMs() {
+  return Date.now();
+}
+
+function loadAuthGuard() {
+  return load(STORAGE_KEYS.authGuard, { failedAttempts: [], lockUntil: 0 });
+}
+
+function saveAuthGuard(guard) {
+  save(STORAGE_KEYS.authGuard, guard);
+}
+
+function cleanupAttempts(guard) {
+  const edge = nowMs() - AUTH_GUARD_POLICY.windowMs;
+  guard.failedAttempts = guard.failedAttempts.filter((ts) => ts >= edge);
+}
+
+function getRemainingLockMs(guard) {
+  return Math.max(0, Number(guard.lockUntil || 0) - nowMs());
+}
+
+function formatRemain(ms) {
+  const total = Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}분 ${s}초`;
+}
+
+function recordFailedLogin() {
+  const guard = loadAuthGuard();
+  cleanupAttempts(guard);
+  guard.failedAttempts.push(nowMs());
+  if (guard.failedAttempts.length >= AUTH_GUARD_POLICY.maxAttempts) {
+    guard.lockUntil = nowMs() + AUTH_GUARD_POLICY.lockMs;
+    guard.failedAttempts = [];
+  }
+  saveAuthGuard(guard);
+  return guard;
+}
+
+function resetFailedLogin() {
+  saveAuthGuard({ failedAttempts: [], lockUntil: 0 });
+}
+
 function setAdminMode(isAdmin) {
   state.isAdmin = isAdmin;
   document.body.classList.toggle("is-admin", isAdmin);
@@ -139,6 +190,7 @@ let db = null;
 let auth = null;
 let usingFirestore = false;
 let usingAuth = false;
+const ADMIN_EMAILS = Array.isArray(adminEmails) ? adminEmails.map((email) => String(email).trim().toLowerCase()) : [];
 
 if (firebaseEnabled) {
   try {
@@ -156,7 +208,14 @@ if (firebaseEnabled) {
 function setDataModeText() {
   const dbMode = usingFirestore ? "Firebase Firestore" : "로컬 저장소(localStorage)";
   const authMode = usingAuth ? "Firebase Auth" : "비활성";
-  el.dataMode.textContent = `데이터 모드: ${dbMode} | 인증 모드: ${authMode}`;
+  const adminMode = ADMIN_EMAILS.length ? `관리자 ${ADMIN_EMAILS.length}명 allowlist` : "관리자 allowlist 미설정";
+  el.dataMode.textContent = `데이터 모드: ${dbMode} | 인증 모드: ${authMode} | ${adminMode}`;
+}
+
+function isAllowedAdmin(user) {
+  if (!user || !user.email) return false;
+  if (!ADMIN_EMAILS.length) return false;
+  return ADMIN_EMAILS.includes(String(user.email).trim().toLowerCase());
 }
 
 function formatDate(year, month, day) {
@@ -495,15 +554,36 @@ el.adminLoginForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  const guard = loadAuthGuard();
+  const remainMs = getRemainingLockMs(guard);
+  if (remainMs > 0) {
+    el.adminResult.textContent = `로그인 시도가 잠겨 있습니다. ${formatRemain(remainMs)} 후 다시 시도하세요.`;
+    return;
+  }
+
   const data = new FormData(el.adminLoginForm);
   const email = String(data.get("email")).trim();
   const password = String(data.get("password"));
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
+    const currentUser = auth.currentUser;
+    if (!isAllowedAdmin(currentUser)) {
+      recordFailedLogin();
+      await signOut(auth);
+      el.adminResult.textContent = "허용된 관리자 계정이 아닙니다.";
+      return;
+    }
+    resetFailedLogin();
     el.adminResult.textContent = "관리자 로그인 완료";
     el.adminLoginForm.reset();
   } catch (error) {
+    const next = recordFailedLogin();
+    const lockedRemain = getRemainingLockMs(next);
+    if (lockedRemain > 0) {
+      el.adminResult.textContent = `로그인 실패 누적으로 잠금되었습니다. ${formatRemain(lockedRemain)} 후 다시 시도하세요.`;
+      return;
+    }
     el.adminResult.textContent = "로그인 실패: 이메일/비밀번호를 확인하세요.";
   }
 });
@@ -620,8 +700,16 @@ function bindAuthObserver() {
     return;
   }
 
-  onAuthStateChanged(auth, (user) => {
-    setAdminMode(Boolean(user));
+  onAuthStateChanged(auth, async (user) => {
+    const allowed = isAllowedAdmin(user);
+    setAdminMode(allowed);
+    if (allowed) {
+      resetFailedLogin();
+    }
+    if (user && !allowed) {
+      await signOut(auth);
+      el.adminResult.textContent = "허용 목록에 없는 계정입니다. firebase-config.js의 adminEmails를 확인하세요.";
+    }
   });
 }
 
