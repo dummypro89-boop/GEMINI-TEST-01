@@ -1,0 +1,96 @@
+{
+  "brand": "TRULY PILATES",
+  "hero": {
+    "eyebrow": "Classic Body Movement Studio",
+    "title": "몸의 균형을 되찾는",
+    "highlight": "TRULY PILATES",
+    "description": "정교한 코칭과 절제된 움직임으로 바른 정렬, 깊은 호흡, 안정된 코어를 만듭니다. 클래식한 공간에서 몸의 기준을 다시 세웁니다.",
+    "ctaLabel": "Explore Program",
+    "ctaHref": "#program"
+  },
+  "nav": [
+    { "label": "Home", "href": "/" },
+    { "label": "About", "href": "/about" },
+    { "label": "Program", "href": "/program" },
+    { "label": "Instructors", "href": "/instructors" },
+    { "label": "Academy", "href": "/academy" },
+    { "label": "Schedule", "href": "/schedule" },
+    { "label": "Pricing", "href": "/pricing" },
+    { "label": "Journal", "href": "/journal" },
+    { "label": "Contact", "href": "/contact" }
+  ],
+  "about": {
+    "title": "About",
+    "description": "TRULY PILATES는 몸의 기본을 세우는 스튜디오입니다. 재활, 정렬 교정, 체력 향상까지 현재 컨디션과 목적에 맞춰 조용하고 밀도 높은 세션을 제공합니다.",
+    "bullets": [
+      "Private & Small Group Session",
+      "Precision Cueing and Hands-on Feedback",
+      "Consulting-based Personal Program Design"
+    ]
+  },
+  "program": {
+    "title": "Program",
+    "steps": [
+      { "title": "1. Body Scan", "description": "정렬, 가동성, 코어 반응을 체크해 현재의 기준점을 세웁니다." },
+      { "title": "2. Focus Setting", "description": "통증 개선, 체형 교정, 퍼포먼스 향상 중 우선순위를 명확히 설정합니다." },
+      { "title": "3. Tailored Sequence", "description": "리포머, 체어, 캐딜락을 활용해 개인별 시퀀스를 정교하게 구성합니다." },
+      { "title": "4. Session Notes", "description": "수업 후 변화 포인트와 다음 세션 가이드를 간결하게 제공합니다." }
+    ]
+  },
+  "teacher": {
+    "title": "Teacher",
+    "instructors": [
+      { "name": "Lead Instructor", "bio": "재활 필라테스 전문. 체형 분석 기반의 맞춤 설계를 담당합니다." },
+      { "name": "Senior Instructor", "bio": "코어 강화와 통증 개선 중심 수업. 기구와 소도구를 통합 지도합니다." },
+      { "name": "Movement Coach", "bio": "밸런스와 움직임 패턴 개선. 초급자도 안정적으로 적응하도록 돕습니다." },
+      { "name": "Rehab Specialist", "bio": "자세 불균형 교정과 기능 회복 중심의 세션을 운영합니다." }
+    ]
+  },
+  "academy": {
+    "title": "Academy",
+    "features": [
+      { "title": "Member Flow", "description": "상담-평가-프로그램 배정-리포트로 이어지는 운영 구조" },
+      { "title": "Reservation", "description": "개인, 듀엣, 그룹 예약 접수 및 스케줄 관리" },
+      { "title": "Instructor Brief", "description": "세션 전 목적/주의점 공유로 티칭 품질 표준화" }
+    ]
+  },
+  "schedule": {
+    "title": "Schedule",
+    "entries": [
+      { "day": "Monday", "sessions": ["08:00 Private", "10:00 Group", "19:00 Private"] },
+      { "day": "Tuesday", "sessions": ["09:00 Rehab", "14:00 Duet", "20:00 Group"] },
+      { "day": "Wednesday", "sessions": ["08:00 Private", "11:00 Group", "18:00 Rehab"] },
+      { "day": "Thursday", "sessions": ["09:00 Duet", "15:00 Private", "19:00 Group"] },
+      { "day": "Friday", "sessions": ["08:00 Rehab", "13:00 Group", "20:00 Private"] },
+      { "day": "Saturday", "sessions": ["09:00 Group", "11:00 Private", "14:00 Duet"] }
+    ]
+  },
+  "pricing": {
+    "title": "Pricing",
+    "plans": [
+      { "name": "Private 1:1", "price": "KRW 850,000 / 10 sessions", "note": "체형 분석 + 개인 리포트 포함" },
+      { "name": "Duet 2:1", "price": "KRW 520,000 / 10 sessions", "note": "동반자와 함께 진행하는 밸런스 세션" },
+      { "name": "Group 4:1", "price": "KRW 320,000 / 10 sessions", "note": "정렬 기반 기초 체력 향상 프로그램" },
+      { "name": "Rehab Care", "price": "KRW 980,000 / 12 sessions", "note": "통증 완화 및 기능 회복 중심 집중 과정" }
+    ]
+  },
+  "journal": {
+    "title": "Journal",
+    "posts": [
+      { "title": "Core Alignment Notes", "summary": "코어 정렬을 유지하는 일상 루틴 가이드.", "date": "2026-02-01" },
+      { "title": "Breath and Tempo", "summary": "호흡 템포가 움직임 품질에 미치는 영향.", "date": "2026-01-22" },
+      { "title": "Reformer Fundamentals", "summary": "리포머 수업 전 알아두면 좋은 기본 원칙.", "date": "2026-01-10" }
+    ]
+  },
+  "contact": {
+    "title": "Contact",
+    "infos": [
+      { "label": "Address", "value": "서울시 강남구 예시로 12" },
+      { "label": "Phone", "value": "02-0000-0000" },
+      { "label": "Email", "value": "trulypilates@example.com" },
+      { "label": "Hours", "value": "평일 08:00 - 21:00 / 토요일 09:00 - 15:00 / 일요일 휴무" }
+    ],
+    "ctaLabel": "Book a Session",
+    "ctaHref": "/program"
+  }
+}

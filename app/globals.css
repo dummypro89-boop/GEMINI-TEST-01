@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f5f0e8;
+  --surface: #ffffff;
+  --surface-soft: #fbf8f2;
+  --line: #e6dfd5;
+  --text: #1f1f1f;
+  --muted: #6b6b6b;
+  --accent: #b8a48a;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: var(--text);
+  font-family: var(--font-noto-sans-kr), sans-serif;
+  background:
+    radial-gradient(1200px 500px at 12% -5%, #ffffffae 0%, transparent 62%),
+    radial-gradient(900px 380px at 94% 10%, #efe7db 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, #f0e8dc 100%);
+}
+
+.section-title {
+  @apply font-serif text-4xl md:text-5xl leading-tight tracking-wide text-sand-900;
+}
+
+.card-surface {
+  @apply rounded-[20px] border border-sand-200 bg-white shadow-[0_6px_16px_rgba(31,31,31,0.04)];
+}
+
+.site-wrap {
+  @apply mx-auto w-[min(1280px,92%)];
+}
+
+.section-wrap {
+  @apply py-24;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-[14px] border border-[#1F1F1F] bg-[#1F1F1F] px-6 py-3 text-sm tracking-wide text-white transition hover:bg-[#2b2b2b];
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-[14px] border border-sand-200 bg-transparent px-6 py-3 text-sm tracking-wide text-sand-900 transition hover:bg-sand-100;
+}
